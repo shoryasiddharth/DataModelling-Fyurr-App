@@ -660,7 +660,7 @@ def create_show_submission():
         new_show = Shows(start_time=form['start_time'], artist_id=form['artist_id'], venue_id=form['venue_id'])
         db.session.add(new_show)
         db.session.commit()
-    except:
+    except Exception as e:
         print(e)
         db.session.rollback()
         abort(404)
