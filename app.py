@@ -163,10 +163,10 @@ def show_venue(venue_id):
         "state": loc.state,
         "phone": venue.phone,
         "seeking_description": venue.seeking_description,
-        "website": "https://www.themusicalhop.com",
+        "website": venue.website_link,
         "facebook_link": venue.facebook_link,
-        "seeking_artist": venue.seeking_artist,
-        "seeking_description": "",
+        "seeking_talent": venue.seeking_artist,
+        "seeking_description": venue.seeking_description,
         "image_link": venue.image_link,
         "past_shows": past_shows,
         "upcoming_shows": upcoming_shows,
@@ -202,7 +202,7 @@ def create_venue_submission():
                 db.session.add(city_new)
                 db.session.commit()
             city = Location.query.filter_by(city=form_data.city.data).one_or_none()
-            new_venue = Venue(name=form_data.name.data, seeking_description= form_data.seeking_description.data, location_id=city.id, address=form_data.address.data, phone=form_data.phone.data, \
+            new_venue = Venue(name=form_data.name.data, website_link= form_data.website_link.data, seeking_description= form_data.seeking_description.data, location_id=city.id, address=form_data.address.data, phone=form_data.phone.data, \
                 seeking_artist=form_data.seeking_talent.data, image_link=form_data.image_link.data, \
                 facebook_link=form_data.facebook_link.data)
             genres=form_data.genres.data
@@ -364,6 +364,7 @@ def show_artist(artist_id):
           "seeking_description": artist.seeking_description,
           "seeking_venue": artist.seeking_venue,
           "image_link": artist.image_link,
+          "website": artist.website_link,
           "past_shows": past_shows,
           "upcoming_shows": upcoming_shows,
           "past_shows_count": past_shows_count,
@@ -395,6 +396,7 @@ def edit_artist(artist_id):
         "city": loc.city,
         "state": loc.state,
         "seeking_description": artist.seeking_description,
+        "website": artist.website_link,
         "phone": artist.phone,
         "facebook_link": artist.facebook_link,
         "seeking_talent": artist.seeking_venue,
@@ -426,6 +428,7 @@ def edit_artist_submission(artist_id):
             artist.phone = form.phone.data
             artist.seeking_description = form.seeking_description.data
             artist.seeking_venue = form.seeking_venue.data
+            artist.website_link: form.website_link.data
             artist.image_link = form.image_link.data
             artist.facebook_link = form.facebook_link.data
             
@@ -479,6 +482,7 @@ def edit_venue(venue_id):
         "address": venue.address,
         "city": loc.city,
         "state": loc.state,
+        "website": venue.website_link,
         "phone": venue.phone,
         "facebook_link": venue.facebook_link,
         "seeking_talent": venue.seeking_artist,
@@ -502,6 +506,7 @@ def edit_venue_submission(venue_id):
             venue.location_id = loc.id
             venue.address = form.address.data
             venue.phone = form.phone.data
+            venue.website_link: form.website_link.data
             venue.seeking_description: form.seeking_description.data
             venue.seeking_artist = form.seeking_talent.data
             venue.image_link = form.image_link.data
@@ -551,7 +556,7 @@ def create_artist_submission():
                 db.session.add(city_new)
                 db.session.commit()
             city = Location.query.filter_by(city=form_data.city.data).one_or_none()
-            new_artist = Artist(name=form_data.name.data, location_id=city.id, seeking_description = form_data.seeking_description.data,  phone=form_data.phone.data, \
+            new_artist = Artist(name=form_data.name.data, location_id=city.id,website_link=form_data.website_link.data, seeking_description = form_data.seeking_description.data,  phone=form_data.phone.data, \
                 seeking_venue=form_data.seeking_venue.data, image_link=form_data.image_link.data, \
                 facebook_link=form_data.facebook_link.data)
             genres =form_data.genres.data
