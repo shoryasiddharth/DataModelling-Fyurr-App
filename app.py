@@ -8,13 +8,33 @@ from logging import Formatter, FileHandler
 import logging
 from flask_sqlalchemy import SQLAlchemy
 from flask_moment import Moment
-from flask import Flask, render_template, request, Response, flash, redirect, url_for, abort, jsonify
+from flask import (
+    Flask, 
+    render_template, 
+    request, 
+    Response, 
+    flash, 
+    redirect, 
+    url_for, 
+    abort, 
+    jsonify
+)
 from enum import unique
 from collections import UserList
 import collections
 import collections.abc
-collections.Callable = collections.abc.Callable
-from models import Genre, Location, artist_genre_table, Artist, Venue, venue_genre_table, Shows, app, db, format_datetime
+collections.Callabsle = collections.abc.Callable
+from models import (
+    Genre, 
+    Location, 
+    artist_genre_table, 
+    Artist, 
+    Venue, 
+    venue_genre_table, 
+    Shows, 
+    app, 
+    db, 
+    format_datetime)
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -142,6 +162,7 @@ def show_venue(venue_id):
         "city": loc.city,
         "state": loc.state,
         "phone": venue.phone,
+        "seeking_description": venue.seeking_description,
         "website": "https://www.themusicalhop.com",
         "facebook_link": venue.facebook_link,
         "seeking_artist": venue.seeking_artist,
@@ -166,45 +187,48 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
-    form_data = request.form.to_dict()
+    form_data = VenueForm(request.form, meta={"csrf": False})
     
-    print(form_data)
+    print(form_data.genres.data)
+    
+    if form_data.validate():
 
-    if form_data['seeking_talent'] == 'y':
-      seeking_telant = True
+
+        
+        try:
+            city = Location.query.filter_by(city=form_data.city.data).one_or_none()
+            if(city is None):
+                city_new = Location(city=form_data.city.data, state=form_data.state.data)
+                db.session.add(city_new)
+                db.session.commit()
+            city = Location.query.filter_by(city=form_data.city.data).one_or_none()
+            new_venue = Venue(name=form_data.name.data, seeking_description= form_data.seeking_description.data, location_id=city.id, address=form_data.address.data, phone=form_data.phone.data, \
+                seeking_artist=form_data.seeking_talent.data, image_link=form_data.image_link.data, \
+                facebook_link=form_data.facebook_link.data)
+            genres=form_data.genres.data
+            for genre in genres:
+                fetch_genre = Genre.query.filter_by(type=genre).one_or_none()  
+                if fetch_genre is not None:
+                    new_venue.genres_v.append(fetch_genre)
+
+                else:
+                    new_genre = Genre(type=genre)
+                    db.session.add(new_genre)
+                    new_venue.genres_v.append(new_genre) 
+            db.session.add(new_venue)
+            db.session.commit()
+            flash('Venue was successfully listed!')
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            abort(500)
+        finally:
+            
+            db.session.close()
+
+        return render_template('pages/home.html')
     else:
-      seeking_telant = False
-    
-    try:
-        city = Location.query.filter_by(city=form_data['city']).one_or_none()
-        if(city is None):
-          city_new = Location(city=form_data['city'], state=form_data['state'])
-          db.session.add(city_new)
-          db.session.commit()
-          city = Location.query.filter_by(city=form_data['city'])
-        new_venue = Venue(name=form_data['name'], location_id=city.id, address=form_data['address'], phone=form_data['phone'], \
-            seeking_artist=seeking_telant, image_link=form_data['image_link'], \
-            facebook_link=form_data['facebook_link'])
-        genre=form_data['genres']
-        fetch_genre = Genre.query.filter_by(type=genre).one_or_none()  
-        if fetch_genre:
-            new_venue.genres_v.append(fetch_genre)
-
-        else:
-            new_genre = Genre(type=genre)
-            db.session.add(new_genre)
-            new_venue.genres_v.append(new_genre) 
-        db.session.add(new_venue)
-        db.session.commit()
-    except Exception as e:
-        print(e)
-        db.session.rollback()
-        abort(500)
-    finally:
-        flash('Venue was successfully listed!')
-        db.session.close()
-
-    return render_template('pages/home.html')
+        abort(401)
 
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
@@ -337,6 +361,7 @@ def show_artist(artist_id):
           "state": loc[0].state,
           "phone": artist.phone,
           "facebook_link": artist.facebook_link,
+          "seeking_description": artist.seeking_description,
           "seeking_venue": artist.seeking_venue,
           "image_link": artist.image_link,
           "past_shows": past_shows,
@@ -369,6 +394,7 @@ def edit_artist(artist_id):
         "genres": genres,
         "city": loc.city,
         "state": loc.state,
+        "seeking_description": artist.seeking_description,
         "phone": artist.phone,
         "facebook_link": artist.facebook_link,
         "seeking_talent": artist.seeking_venue,
@@ -381,46 +407,52 @@ def edit_artist(artist_id):
 def edit_artist_submission(artist_id):
     # artist record with ID <artist_id> using the new attributes
     
-    form = request.form.to_dict()
+    form = ArtistForm(request.form, meta={"csrf": False})
     print(form)
-    try:
-        artist = Artist.query.filter_by(id=artist_id).one_or_none()
+    if form.validate():
+        try:
+            artist = Artist.query.filter_by(id=artist_id).one_or_none()
 
-        loc = Location.query.filter_by(city=form['city']).one_or_none()
+            loc = Location.query.filter_by(city=form.city.data).one_or_none()
+            
+            if loc is None:
+                loc=Location(city=form.city.data ,state= form.state.data)
+                db.session.add(loc)
+                db.session.commit()
+                
+                
+            artist.name = form.name.data
+            artist.location_id = loc.id
+            artist.phone = form.phone.data
+            artist.seeking_description = form.seeking_description.data
+            artist.seeking_venue = form.seeking_venue.data
+            artist.image_link = form.image_link.data
+            artist.facebook_link = form.facebook_link.data
+            
+            
+            artist.genres_a.clear()
+            
+            for genre in form.genres.data:
+                genre_add = Genre.query.filter_by(type=genre).one_or_none()  # Throws an exception if more than one returned, returns None if none
+                if genre_add is None:
+                    new_genre = Genre(type=genre)
+                    db.session.add(new_genre)
+                    artist.genres_a.append(new_genre)
+                else:
+                    artist.genres_a.append(genre_add)
+            db.session.commit()
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            abort(404)
+        finally:
+            db.session.close()
         
-        if loc is None:
-          loc=Location(city=form['city'],state= form['state'])
-          db.session.add(loc)
-          db.session.commit()
-          
-        
-        artist.name = form['name']
-        artist.location_id = loc.id
-        artist.phone = form['phone']
-        artist.seeking_venue = True if 'seeking_venue' in  form.keys() else False
-        artist.image_link = form['image_link']
-        artist.facebook_link = form['facebook_link']
-        
-        
-        artist.genres_a.clear()
-        
-        genre_add = Genre.query.filter_by(type=form['genres']).one_or_none()  # Throws an exception if more than one returned, returns None if none
-        if genre_add is None:
-            new_genre = Genre(type=form['genres'])
-            db.session.add(new_genre)
-            artist.genres_a.append(new_genre)
-        else:
-            artist.genres_a.append(genre_add)
-        db.session.commit()
-    except Exception as e:
-        print(e)
-        db.session.rollback()
-        abort(404)
-    finally:
-        db.session.close()
-    
 
-    return redirect(url_for('show_artist', artist_id=artist_id))
+        return redirect(url_for('show_artist', artist_id=artist_id))
+    else:
+        flash('Artist detials were not updated!')
+        abort(401)
 
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
@@ -459,40 +491,43 @@ def edit_venue(venue_id):
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
     # venue record with ID <venue_id> using the new attributes
-    form = request.form.to_dict()
-    print(form)
-    try:
-        venue = Venue.query.filter_by(id=venue_id).one_or_none()
+    form = VenueForm(request.form, meta={"csrf": False})
+    print(form.seeking_talent.data)
+    if form.validate():
+        try:
+            venue = Venue.query.filter_by(id=venue_id).one_or_none()
 
-        loc = Location.query.filter_by(city=form['city']).one_or_none()
-        venue.name = form['name']
-        venue.location_id = loc.id
-        venue.address = form['address']
-        venue.phone = form['phone']
-        venue.seeking_artist = True if 'seeking_talent' in form.keys() else False
-        venue.image_link = form['image_link']
-        venue.facebook_link = form['facebook_link']
-        
-        venue.genres_v.clear()
-        
-        
-        
-        genre_add = Genre.query.filter_by(type=form['genres']).one_or_none()  # Throws an exception if more than one returned, returns None if none
-        if genre_add is None:
-            new_genre = Genre(type=form['genres'])
-            db.session.add(new_genre)
-            venue.genres_v.append(new_genre)
-        else:
-            venue.genres_v.append(genre_add)
-        db.session.commit()
-    except Exception as e:
-        print(e)
-        db.session.rollback()
-        abort(404)
-    finally:
-        db.session.close()
-    return redirect(url_for('show_venue', venue_id=venue_id))
-
+            loc = Location.query.filter_by(city=form.city.data).one_or_none()
+            venue.name = form.name.data
+            venue.location_id = loc.id
+            venue.address = form.address.data
+            venue.phone = form.phone.data
+            venue.seeking_description: form.seeking_description.data
+            venue.seeking_artist = form.seeking_talent.data
+            venue.image_link = form.image_link.data
+            venue.facebook_link = form.facebook_link.data
+            
+            venue.genres_v.clear()
+            
+            for genre in form.genres.data:
+                genre_add = Genre.query.filter_by(type=genre).one_or_none()  # Throws an exception if more than one returned, returns None if none
+                if genre_add is None:
+                    new_genre = Genre(type=genre)
+                    db.session.add(new_genre)
+                    venue.genres_v.append(new_genre)
+                else:
+                    venue.genres_v.append(genre_add)
+            db.session.commit()
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            abort(404)
+        finally:
+            db.session.close()
+        return redirect(url_for('show_venue', venue_id=venue_id))
+    else:
+        flash('Venue was not updated!')
+        abort(401)
 #  Create Artist
 #  ----------------------------------------------------------------
 
@@ -505,48 +540,45 @@ def create_artist_form():
 
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
-    form_data = request.form.to_dict()
+    form_data = ArtistForm(request.form, meta={"csrf": False})
     
-    print(form_data)
+    if form_data.validate():
+        
+        try:
+            city = Location.query.filter_by(city=form_data.city.data).one_or_none()
+            if(city is None):
+                city_new = Location(city=form_data.city.data, state=form_data.state.data)
+                db.session.add(city_new)
+                db.session.commit()
+            city = Location.query.filter_by(city=form_data.city.data).one_or_none()
+            new_artist = Artist(name=form_data.name.data, location_id=city.id, seeking_description = form_data.seeking_description.data,  phone=form_data.phone.data, \
+                seeking_venue=form_data.seeking_venue.data, image_link=form_data.image_link.data, \
+                facebook_link=form_data.facebook_link.data)
+            genres =form_data.genres.data
+            for genre in genres:
+                fetch_genre = Genre.query.filter_by(type=genre).one_or_none()  
+                if fetch_genre:
+                    new_artist.genres_a.append(fetch_genre)
+                else:
+                    new_genre = Genre(type=genre)
+                    db.session.add(new_genre)
+                    new_artist.genres_a.append(new_genre) 
+            db.session.add(new_artist)
+            db.session.commit()
+            flash('Artist ' + form_data.name.data + ' was successfully listed!')
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            abort(500)
+        finally:
+            flash('Venue was successfully listed!')
+            db.session.close()
+        # on successful db insert, flash success
 
-    if form_data['seeking_venue'] == 'y':
-      seeking_venue = True
+        return render_template('pages/home.html')
     else:
-      seeking_venue = False
-    
-    try:
-        city = Location.query.filter_by(city=form_data['city']).one_or_none()
-        if(city is None):
-          city_new = Location(city=form_data['city'], state=form_data['state'])
-          db.session.add(city_new)
-          db.session.commit()
-          city = Location.query.filter_by(city=form_data['city'])
-        new_artist = Artist(name=form_data['name'], location_id=city.id,  phone=form_data['phone'], \
-            seeking_venue=seeking_venue, image_link=form_data['image_link'], \
-            facebook_link=form_data['facebook_link'])
-        genre =form_data['genres']
-        fetch_genre = Genre.query.filter_by(type=genre).one_or_none()  
-        if fetch_genre:
-            new_artist.genres_a.append(fetch_genre)
-
-        else:
-            new_genre = Genre(type=genre)
-            db.session.add(new_genre)
-            new_artist.genres_a.append(new_genre) 
-        db.session.add(new_artist)
-        db.session.commit()
-    except Exception as e:
-        print(e)
-        db.session.rollback()
-        abort(500)
-    finally:
-        flash('Venue was successfully listed!')
-        db.session.close()
-    # on successful db insert, flash success
-    flash('Artist ' + request.form['name'] + ' was successfully listed!')
-
-    return render_template('pages/home.html')
-
+        flash('Artist was not added!')
+        abort(401)
 
 #  Shows
 #  ----------------------------------------------------------------
@@ -579,25 +611,29 @@ def create_shows():
 
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
-    form = request.form.to_dict()
+    form = ShowForm(request.form, meta={"csrf": False})
+    if form.validate():
     
-    try:
-        new_show = Shows(start_time=form['start_time'], artist_id=form['artist_id'], venue_id=form['venue_id'])
-        db.session.add(new_show)
-        db.session.commit()
-    except Exception as e:
-        print(e)
-        db.session.rollback()
-        abort(404)
-    finally:
-        db.session.close()
+        try:
+            new_show = Shows(start_time=form.start_time.data, artist_id=form.artist_id.data, venue_id=form.venue_id.data)
+            db.session.add(new_show)
+            db.session.commit()
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            abort(404)
+        finally:
+            db.session.close()
 
-    # on successful db insert, flash success
-    flash('Show was successfully listed!')
-    # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g., flash('An error occurred. Show could not be listed.')
-    # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-    return render_template('pages/home.html')
+        # on successful db insert, flash success
+        flash('Show was successfully listed!')
+        # TODO: on unsuccessful db insert, flash an error instead.
+        # e.g., flash('An error occurred. Show could not be listed.')
+        # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+        return render_template('pages/home.html')
+    else:
+        flash('Show was not listed!')
+        abort(401)
 
 
 @app.errorhandler(404)
@@ -632,6 +668,6 @@ if __name__ == '__main__':
 # Or specify port manually:
 '''
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 6000))
     app.run(host='0.0.0.0', port=port)
 '''
